@@ -1,66 +1,41 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: heart-disease-api
+  name: heart-disease-api-deployment
   labels:
     app: heart-disease-api
 spec:
   replicas: 2
   selector:
     matchLabels:
-      If you are using Python 3.12/3.13 (or a newer 3.x build), update `.github/workflows/ci_cd.yml` and your `Dockerfile` so the GitHub Actions runner matches your local environment.
-
-*(Note: If your local version is actually Python 3.3, modern packages like `pandas`, `fastapi`, `scikit-learn`, and `mlflow` require Python **3.9+**. You will need a modern Python build like 3.10, 3.11, or 3.12 to run these libraries).*
-
----
-
-### Step 1: Update `.github/workflows/ci_cd.yml`
-
-Run this command in **Git Bash** to update the Python version setting in your CI/CD workflow:
-
-```bash
-cat << 'EOF' > .github/workflows/ci_cd.yml
-name: Heart Disease MLOps CI/CD Pipeline
-
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
-
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install flake8 pytest httpx
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-    - name: Code Linting with Flake8
-      run: |
-        flake8 src tests --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 src tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-    - name: Fetch Dataset & Preprocess Data
-      run: |
-        python src/data_loader.py
-        python src/preprocessing.py
-
-    - name: Train Models & Track MLflow Experiments
-      run: |
-        python src/train.py
-
-    - name: Execute Pytest Suite
-      run: |
-        pytest -v
+      app: heart-disease-api
+  template:
+    metadata:
+      labels:
+        app: heart-disease-api
+    spec:
+      containers:
+      - name: heart-disease-api
+        image: heart-disease-api:v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
