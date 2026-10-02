@@ -3,6 +3,7 @@ import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from prometheus_fastapi_instrumentator import Instrumentator
 
 app = FastAPI(
     title="Heart Disease Risk Prediction API",
@@ -10,12 +11,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Define paths to saved artifacts
+# Initialize Prometheus Instrumentator
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
 MODEL_PATH = "models/best_model.pkl"
 SCALER_PATH = "data/processed/scaler.pkl"
 IMPUTER_PATH = "data/processed/imputer.pkl"
 
-# Load artifacts into memory
 try:
     model = joblib.load(MODEL_PATH)
     scaler = joblib.load(SCALER_PATH)
@@ -41,7 +43,7 @@ class PatientData(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"message": "Heart Disease Prediction API is active. Access /docs for Swagger UI."}
+    return {"message": "Heart Disease Prediction API is active. Access /docs for Swagger UI or /metrics for Prometheus metrics."}
 
 @app.get("/health")
 def health_check():
@@ -55,15 +57,12 @@ def predict(data: PatientData):
         raise HTTPException(status_code=500, detail="Model or preprocessors not loaded.")
     
     try:
-        # Convert request body to DataFrame
         input_dict = data.model_dump() if hasattr(data, 'model_dump') else data.dict()
         df = pd.DataFrame([input_dict])
         
-        # Apply preprocessing
         imputed_data = imputer.transform(df)
         scaled_data = scaler.transform(imputed_data)
         
-        # Run inference
         prediction = int(model.predict(scaled_data)[0])
         probabilities = model.predict_proba(scaled_data)[0]
         confidence = float(probabilities[prediction])
